@@ -1,0 +1,150 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   CodeRace — Neon Dark Theme (pure black)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Neon accent colors (CIELab derived) ───────────────────────────── */
+  --neon-green:  #84cc16;
+  --neon-blue:   #00a5ff;
+  --neon-purple: #e46fff;
+  --neon-orange: #ff8800;
+
+  /* ── Dimmed neon ───────────────────────────────────────────────────── */
+  --neon-green-dim:  #6ba812;
+  --neon-blue-dim:   #0085cc;
+  --neon-purple-dim: #b85acc;
+  --neon-orange-dim: #cc6e00;
+
+  /* ── Glow shadows ──────────────────────────────────────────────────── */
+  --glow-green:  0 0 12px rgba(132, 204, 22, 0.5);
+  --glow-blue:   0 0 12px rgba(0, 165, 255, 0.5);
+  --glow-purple: 0 0 12px rgba(228, 111, 255, 0.5);
+  --glow-orange: 0 0 12px rgba(255, 136, 0, 0.5);
+
+  /* ── Backgrounds (pure black) ──────────────────────────────────────── */
+  --bg-root:     #000000;
+  --bg-dark:     #060606;
+  --bg-panel:    #0c0c0c;
+  --bg-card:     #111111;
+  --bg-elevated: #181818;
+  --bg-input:    #0a0a0a;
+
+  /* ── Borders ───────────────────────────────────────────────────────── */
+  --border:       #1e1e1e;
+  --border-light: #2a2a2a;
+  --border-focus: var(--neon-green);
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --text-primary:   #e0e0e0;
+  --text-secondary: #888888;
+  --text-muted:     #555555;
+  --text-dim:       #333333;
+
+  /* ── Semantic ──────────────────────────────────────────────────────── */
+  --success:  var(--neon-green);
+  --error:    #ff4466;
+  --warning:  var(--neon-orange);
+  --info:     var(--neon-blue);
+
+  /* ── Fonts ─────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ── Misc ──────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --transition: 0.15s ease;
+
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-root);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Resets ─────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Custom scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Selection ─────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 165, 255, 0.2);
+  color: var(--neon-blue);
+}
+
+/* ── Links ─────────────────────────────────────────────────────────────── */
+a {
+  color: var(--neon-blue);
+  text-decoration: none;
+  transition: color var(--transition), text-shadow var(--transition);
+}
+a:hover {
+  color: var(--neon-blue);
+  text-shadow: var(--glow-blue);
+}
+
+/* ── CodeMirror overrides ──────────────────────────────────────────────── */
+.cm-editor {
+  font-family: var(--font-mono) !important;
+  font-size: 13.5px !important;
+  background: var(--bg-dark) !important;
+}
+.cm-editor .cm-gutters {
+  background: var(--bg-panel) !important;
+  border-right: 1px solid var(--border) !important;
+  color: rgba(0, 165, 255, 0.3) !important;
+}
+.cm-editor .cm-activeLineGutter {
+  background: var(--bg-elevated) !important;
+  color: rgba(0, 165, 255, 0.55) !important;
+}
+.cm-editor .cm-activeLine {
+  background: rgba(132, 204, 22, 0.04) !important;
+}
+.cm-editor .cm-selectionBackground {
+  background: rgba(0, 165, 255, 0.12) !important;
+}
+.cm-editor .cm-cursor {
+  border-left-color: var(--neon-green) !important;
+}
+.cm-editor .cm-matchingBracket {
+  background: rgba(132, 204, 22, 0.15) !important;
+  color: var(--neon-green) !important;
+}

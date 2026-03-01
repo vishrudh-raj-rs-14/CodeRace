@@ -1,0 +1,46 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+import NavBar from "./components/NavBar";
+import RequireAuthRoute from "./components/RequireAuthRoute";
+import MouseGlow from "./components/MouseGlow";
+import HomePage from "./pages/HomePage";
+import GamePage from "./pages/GamePage";
+import BotPage from "./pages/BotPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import TracksetListPage from "./pages/TracksetListPage";
+import TracksetPlayPage from "./pages/TracksetPlayPage";
+import TracksetEditorPage from "./pages/TracksetEditorPage";
+
+function App() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+      <MouseGlow />
+      <NavBar />
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Protected routes — redirect to /login if not authenticated */}
+          <Route path="/tracksets" element={<RequireAuthRoute><TracksetListPage /></RequireAuthRoute>} />
+          <Route path="/tracksets/new" element={<RequireAuthRoute><TracksetEditorPage /></RequireAuthRoute>} />
+          <Route path="/tracksets/:id/edit" element={<RequireAuthRoute><TracksetEditorPage /></RequireAuthRoute>} />
+          <Route path="/play/:id" element={<RequireAuthRoute><TracksetPlayPage /></RequireAuthRoute>} />
+
+          {/* Legacy routes */}
+          <Route path="/game" element={<GamePage />} />
+          <Route path="/bot" element={<BotPage />} />
+
+          {/* Redirect old editor to trackset editor */}
+          <Route path="/editor" element={<Navigate to="/tracksets" replace />} />
+
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
+  );
+}
+
+export default App;

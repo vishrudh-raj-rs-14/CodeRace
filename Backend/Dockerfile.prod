@@ -1,0 +1,60 @@
+
+#build nsjail
+FROM debian:bookworm-slim AS nsjail
+WORKDIR /app
+RUN apt-get update && \
+  apt-get install -y \
+    git \
+    autoconf \
+    bison \
+    flex \
+    gcc \
+    g++ \
+    libnl-route-3-dev \
+    libprotobuf-dev \
+    libseccomp-dev \
+    libtool \
+    make \
+    pkg-config \
+    protobuf-compiler && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/google/nsjail.git .
+RUN make -j
+
+
+# ---------- Stage 2: Build Go server ----------
+FROM golang AS go-builder
+
+WORKDIR /app
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server
+
+
+# ---------- Stage 3: Final runtime ----------
+FROM ubuntu:latest
+
+RUN apt update && apt install -y \
+    libprotobuf-dev \
+    libnl-route-3-200 \
+    ca-certificates \
+    python3
+
+WORKDIR /app
+# Copy nsjail
+
+COPY --from=go-builder /app/ ./
+
+COPY --from=nsjail /usr/lib/*-linux-gnu/libprotobuf.so.32 /usr/lib/*-linux-gnu/libnl-route-3.so.200 \
+  /lib/*-linux-gnu/libnl-3.so.200 /lib/*-linux-gnu/libz.so.1 /usr/lib/*-linux-gnu/libstdc++.so.6 \
+  /lib/*-linux-gnu/libgcc_s.so.1 /lib/
+
+COPY --from=nsjail /app/nsjail /app/nsjail/
+
+
+EXPOSE 8080
+
+CMD ["./server"]

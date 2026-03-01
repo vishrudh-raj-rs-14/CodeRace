@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: coderace-db
+    environment:
+      POSTGRES_USER: coderace
+      POSTGRES_PASSWORD: coderace
+      POSTGRES_DB: coderace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coderace"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  my-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    cgroup: host
+    container_name: my-server
+    privileged: true
+    environment:
+      DATABASE_URL: "host=postgres user=coderace password=coderace dbname=coderace port=5432 sslmode=disable"
+      JWT_SECRET: "coderace-dev-secret-change-in-prod"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - .:/app                # mount source for hot reload
+      - /app/tmp              # anonymous volume so air tmp doesn't sync back
+    tty: true
+    stdin_open: true
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
