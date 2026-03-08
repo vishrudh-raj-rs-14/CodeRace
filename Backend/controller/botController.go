@@ -143,10 +143,41 @@ func SubmitTracksetController(c *fiber.Ctx) error {
 
 	result := botrunner.RunTrackset(ctx, SandboxMgr, req.Code, trackDatas)
 
-	// If all finished, check if this beats the player's personal best.
-	if result.AllFinished {
-		tsID, _ := uuid.Parse(req.TracksetID)
+	tsID, _ := uuid.Parse(req.TracksetID)
 
+	// ── Always record the submission attempt ─────────────────────────────
+	{
+		times := make([]float64, len(result.TrackResults))
+		reasons := make([]string, 0)
+		for i, tr := range result.TrackResults {
+			times[i] = math.Round(tr.FinishTime*1000) / 1000
+			if !tr.Finished {
+				reasons = append(reasons, tr.Reason)
+			}
+		}
+		timesJSON, _ := json.Marshal(times)
+		reason := ""
+		if result.AllFinished {
+			reason = "finished"
+		} else if len(reasons) > 0 {
+			reason = reasons[0]
+		}
+
+		sub := models.Submission{
+			TracksetID:  tsID,
+			UserID:      userID,
+			Code:        req.Code,
+			AllFinished: result.AllFinished,
+			Times:       timesJSON,
+			TotalTime:   result.TotalTime,
+			Score:       result.Score,
+			Reason:      reason,
+		}
+		database.DB.Create(&sub)
+	}
+
+	// ── If all finished, check if this beats the player's personal best ──
+	if result.AllFinished {
 		// Collect per-track times.
 		times := make([]float64, len(result.TrackResults))
 		for i, tr := range result.TrackResults {

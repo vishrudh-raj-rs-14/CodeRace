@@ -81,3 +81,26 @@ type TracksetScore struct {
 	Score       int             `gorm:"not null;default:0;index" json:"score"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
+
+// ─── Submission ──────────────────────────────────────────────────────────────
+
+// Submission stores every submission attempt a user makes for a trackset.
+type Submission struct {
+	ID          uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
+	TracksetID  uuid.UUID       `gorm:"type:uuid;not null;index" json:"tracksetId"`
+	UserID      uuid.UUID       `gorm:"type:uuid;not null;index" json:"userId"`
+	Code        string          `gorm:"type:text;not null" json:"code"`
+	AllFinished bool            `gorm:"not null;default:false" json:"allFinished"`
+	Times       json.RawMessage `gorm:"type:jsonb" json:"times"`
+	TotalTime   float64         `gorm:"not null;default:0" json:"totalTime"`
+	Score       int             `gorm:"not null;default:0" json:"score"`
+	Reason      string          `gorm:"type:text" json:"reason"`
+	CreatedAt   time.Time       `json:"createdAt"`
+}
+
+func (s *Submission) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
+}

@@ -20,6 +20,7 @@ func main() {
 		&models.Trackset{},
 		&models.Track{},
 		&models.TracksetScore{},
+		&models.Submission{},
 	)
 
 	// ── Sandbox manager ──────────────────────────────────────────────────
@@ -47,6 +48,7 @@ func main() {
 	router.SetupTrackRoutes(api)
 	router.SetupTracksetRoutes(api)
 	router.SetupLeaderboardRoutes(api)
+	router.SetupMatchRoutes(api)
 
 	log.Fatal(app.Listen(":3000"))
 }

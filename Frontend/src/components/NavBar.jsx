@@ -21,6 +21,9 @@ export default function NavBar() {
         <Link to="/tracksets" style={styles.link}>
           Tracksets
         </Link>
+        <Link to="/playground" style={styles.link}>
+          Playground
+        </Link>
       </div>
 
       <div style={styles.right}>

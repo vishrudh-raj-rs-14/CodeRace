@@ -10,6 +10,8 @@ import RegisterPage from "./pages/RegisterPage";
 import TracksetListPage from "./pages/TracksetListPage";
 import TracksetPlayPage from "./pages/TracksetPlayPage";
 import TracksetEditorPage from "./pages/TracksetEditorPage";
+import MatchPage from "./pages/MatchPage";
+import PlaygroundPage from "./pages/PlaygroundPage";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
           <Route path="/tracksets/new" element={<RequireAuthRoute><TracksetEditorPage /></RequireAuthRoute>} />
           <Route path="/tracksets/:id/edit" element={<RequireAuthRoute><TracksetEditorPage /></RequireAuthRoute>} />
           <Route path="/play/:id" element={<RequireAuthRoute><TracksetPlayPage /></RequireAuthRoute>} />
+          <Route path="/playground" element={<RequireAuthRoute><PlaygroundPage /></RequireAuthRoute>} />
+          <Route path="/match/:id" element={<RequireAuthRoute><MatchPage /></RequireAuthRoute>} />
 
           {/* Legacy routes */}
           <Route path="/game" element={<GamePage />} />

@@ -287,6 +287,104 @@ func TrackFromFile(data *TrackFileData) []TrackRect {
 	return rects
 }
 
+// ─── raycasts ────────────────────────────────────────────────────────────────
+
+// RaycastHit describes one ray cast from the car into the world.
+type RaycastHit struct {
+	Angle    float64 `json:"angle"`    // absolute world angle of the ray (rad)
+	RelAngle float64 `json:"relAngle"` // angle relative to car heading (rad)
+	Distance float64 `json:"distance"` // distance to the first non-road surface (px)
+	Surface  string  `json:"surface"`  // name of the surface hit ("grass", "wall", …)
+	EndX     float64 `json:"endX"`     // world X of the hit point
+	EndY     float64 `json:"endY"`     // world Y of the hit point
+}
+
+// RaycastMaxDist is the maximum distance a ray will travel.
+const RaycastMaxDist = 1200.0
+
+// raycastStep is the distance between sample points along a ray.
+const raycastStep = 4.0
+
+// CastRay marches a ray from (ox, oy) in direction `angle` (radians)
+// across the track rectangles.  It starts on the current surface and
+// reports the first position where the surface changes to a non-road
+// type, or where it hits a wall / world boundary.  If it goes from
+// road→grass→road, the first grass hit is reported.
+func CastRay(ox, oy, angle, maxDist float64, rects []TrackRect, worldW, worldH int) RaycastHit {
+	dx := math.Cos(angle)
+	dy := math.Sin(angle)
+
+	startSurf := surfaceAt(rects, ox, oy)
+
+	dist := raycastStep
+	for dist <= maxDist {
+		px := ox + dx*dist
+		py := oy + dy*dist
+
+		// World boundary check
+		if px < 0 || px > float64(worldW) || py < 0 || py > float64(worldH) {
+			return RaycastHit{
+				Angle: angle, Distance: dist,
+				Surface: "boundary", EndX: px - dx*raycastStep, EndY: py - dy*raycastStep,
+			}
+		}
+
+		surf := surfaceAt(rects, px, py)
+
+		// Wall: always report immediately
+		if surf.Name == "wall" {
+			return RaycastHit{
+				Angle: angle, Distance: dist,
+				Surface: "wall", EndX: px, EndY: py,
+			}
+		}
+
+		// If we started on road and hit a non-road surface, report it
+		if startSurf.Name == "road" && surf.Name != "road" {
+			return RaycastHit{
+				Angle: angle, Distance: dist,
+				Surface: surf.Name, EndX: px, EndY: py,
+			}
+		}
+
+		// If we started on non-road, report when surface changes at all
+		if startSurf.Name != "road" && surf.Name != startSurf.Name {
+			return RaycastHit{
+				Angle: angle, Distance: dist,
+				Surface: surf.Name, EndX: px, EndY: py,
+			}
+		}
+
+		dist += raycastStep
+	}
+
+	// Max distance reached without a surface change
+	return RaycastHit{
+		Angle: angle, Distance: maxDist,
+		Surface: "none", EndX: ox + dx*maxDist, EndY: oy + dy*maxDist,
+	}
+}
+
+// CastRays fires 5 rays from the car centre:
+//
+//	[0] forward      (heading + 0°)
+//	[1] left 45°     (heading − 45°)
+//	[2] right 45°    (heading + 45°)
+//	[3] left 90°     (heading − 90°)
+//	[4] right 90°    (heading + 90°)
+func CastRays(cx, cy, heading float64, rects []TrackRect, worldW, worldH int) []RaycastHit {
+	offsets := []float64{0, -math.Pi / 4, math.Pi / 4, -math.Pi / 2, math.Pi / 2}
+	rays := make([]RaycastHit, len(offsets))
+	for i, off := range offsets {
+		absAngle := heading + off
+		hit := CastRay(cx, cy, absAngle, RaycastMaxDist, rects, worldW, worldH)
+		hit.Angle = absAngle
+		hit.RelAngle = off
+		rays[i] = hit
+	}
+	return rays
+}
+
 // ─── input / output types ────────────────────────────────────────────────────
 
 // W = throttle, S = brake/reverse, A = steer left, D = steer right.
@@ -319,6 +417,7 @@ type Frame struct {
 	Finish      *FinishJSON       `json:"finish,omitempty"`
 	Race        RaceState         `json:"race"`
 	Camera      CameraInfo        `json:"camera"`
+	Raycasts    []RaycastHit      `json:"raycasts,omitempty"`
 }
 
 type WorldInfo struct {
@@ -457,6 +556,13 @@ func (r *Racer) UpdateInput(state InputState) {
 	r.mu.Lock()
 	r.input = state
 	r.mu.Unlock()
+}
+
+// OffsetStart shifts the car's starting position by (dx, dy) pixels.
+// Used by multiplayer to stagger starting positions.
+func (r *Racer) OffsetStart(dx, dy float64) {
+	r.car.X += dx
+	r.car.Y += dy
 }
 
 func (r *Racer) Start() { go r.loop() }
@@ -752,6 +858,9 @@ func (r *Racer) BuildFrame() Frame {
 		hitList = append(hitList, order)
 	}
 
+	// Cast raycasts from car centre.
+	rays := CastRays(c.X, c.Y, c.Heading, r.track, r.worldW, r.worldH)
+
 	return Frame{
 		Tick:        r.tick,
 		Car:         c,
@@ -771,6 +880,7 @@ func (r *Racer) BuildFrame() Frame {
 			W: ViewW,
 			H: ViewH,
 		},
+		Raycasts: rays,
 	}
 }
 

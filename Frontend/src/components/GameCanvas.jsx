@@ -383,6 +383,75 @@ function renderFrame(canvas, frame) {
     ctx.globalAlpha = 1.0;
   }
 
+  // ── Raycasts ──────────────────────────────────────────────────────
+  const raycasts = frame.raycasts || [];
+  if (raycasts.length > 0) {
+    const RAY_COLORS = [
+      C.neonGreen,   // forward
+      C.neonBlue,    // left 45
+      C.neonBlue,    // right 45
+      C.neonPink,    // left 90
+      C.neonPink,    // right 90
+    ];
+    for (let ri = 0; ri < raycasts.length; ri++) {
+      const ray = raycasts[ri];
+      ctx.strokeStyle = RAY_COLORS[ri] || C.neonGreen;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.55;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(car.x, car.y);
+      ctx.lineTo(ray.endX, ray.endY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Hit point dot
+      ctx.fillStyle = RAY_COLORS[ri] || C.neonGreen;
+      ctx.beginPath();
+      ctx.arc(ray.endX, ray.endY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
+  // ── Other players' cars (multiplayer) ─────────────────────────────
+  const otherCars = frame.otherCars || [];
+  for (const oc of otherCars) {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.translate(oc.x, oc.y);
+    ctx.rotate(oc.heading);
+    const oL = oc.h || car.h;
+    const oW = oc.w || car.w;
+    // Underglow for other player
+    ctx.shadowColor = C.neonBlue;
+    ctx.shadowBlur = 10;
+    if (carImg.complete && carImg.naturalWidth > 0) {
+      const aspect = carImg.naturalWidth / carImg.naturalHeight;
+      const sprH = oL * CAR_SPRITE_SCALE;
+      const sprW = sprH * aspect;
+      ctx.save();
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(carImg, -sprW / 2, -sprH / 2, sprW, sprH);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = C.neonBlue;
+      roundRect(ctx, -oL / 2, -oW / 2, oL, oW, 4);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    // Name tag
+    if (oc.name) {
+      ctx.globalAlpha = 0.7;
+      ctx.font = `bold 11px ${C.font}`;
+      ctx.fillStyle = C.neonBlue;
+      ctx.textAlign = "center";
+      ctx.fillText(oc.name, oc.x, oc.y - oW - 6);
+      ctx.textAlign = "start";
+      ctx.globalAlpha = 1.0;
+    }
+  }
+
   // Car
   ctx.save();
   ctx.translate(car.x, car.y);
@@ -532,6 +601,17 @@ function renderFrame(canvas, frame) {
   ctx.arc(mmX + car.x * sx, mmY + car.y * sy, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
+
+  // Other players on minimap
+  for (const oc of otherCars) {
+    ctx.fillStyle = C.neonBlue;
+    ctx.shadowColor = C.neonBlue;
+    ctx.shadowBlur = 3;
+    ctx.beginPath();
+    ctx.arc(mmX + oc.x * sx, mmY + oc.y * sy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
 
   // Viewport rect on minimap
   ctx.strokeStyle = "rgba(255,255,255,0.5)";

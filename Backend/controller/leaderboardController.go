@@ -69,3 +69,27 @@ func MyScoreController(c *fiber.Ctx) error {
 		"times":     score.Times,
 	})
 }
+
+// MySubmissionsController returns all submission attempts by the requesting user
+// for a given trackset, ordered newest first.
+// GET /api/tracksets/:id/my-submissions
+func MySubmissionsController(c *fiber.Ctx) error {
+	tsID := c.Params("id")
+	userID := c.Locals("userID")
+
+	limit := c.QueryInt("limit", 50)
+	if limit > 200 {
+		limit = 200
+	}
+
+	var subs []models.Submission
+	if err := database.DB.
+		Where("trackset_id = ? AND user_id = ?", tsID, userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&subs).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch submissions"})
+	}
+
+	return c.JSON(subs)
+}

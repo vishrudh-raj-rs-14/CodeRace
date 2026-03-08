@@ -34,4 +34,5 @@ func SetupGameRoutes(app fiber.Router) {
 func SetupLeaderboardRoutes(api fiber.Router) {
 	api.Get("/tracksets/:id/leaderboard", controller.LeaderboardController)
 	api.Get("/tracksets/:id/my-score", middleware.RequireAuth, controller.MyScoreController)
+	api.Get("/tracksets/:id/my-submissions", middleware.RequireAuth, controller.MySubmissionsController)
 }

@@ -40,10 +40,11 @@ type initPayload struct {
 }
 
 type botState struct {
-	Tick    uint64          `json:"tick"`
-	Car     racer.Car       `json:"car"`
-	Surface botSurface      `json:"surface"`
-	Race    racer.RaceState `json:"race"`
+	Tick     uint64             `json:"tick"`
+	Car      racer.Car          `json:"car"`
+	Surface  botSurface         `json:"surface"`
+	Race     racer.RaceState    `json:"race"`
+	Raycasts []racer.RaycastHit `json:"raycasts"`
 }
 
 type botSurface struct {
@@ -202,7 +203,8 @@ func RunSingle(ctx context.Context, mgr *sandbox.Manager, code string, trackData
 				DragMult:  surf.DragMult,
 				SpeedMult: surf.SpeedMult,
 			},
-			Race: frame.Race,
+			Race:     frame.Race,
+			Raycasts: frame.Raycasts,
 		}
 		stateBytes, _ := json.Marshal(state)
 		if _, err := fmt.Fprintf(sb.Stdin, "%s\n", stateBytes); err != nil {

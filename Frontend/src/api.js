@@ -123,3 +123,29 @@ export async function getLeaderboard(tracksetId, limit = 50) {
 export async function getMyScore(tracksetId) {
   return request("GET", `/tracksets/${tracksetId}/my-score`);
 }
+
+export async function getMySubmissions(tracksetId, limit = 50) {
+  return request("GET", `/tracksets/${tracksetId}/my-submissions?limit=${limit}`);
+}
+
+// ── Match (multiplayer) ──────────────────────────────────────────────────────
+
+export async function listPlaygroundTracks() {
+  return request("GET", "/match/tracks");
+}
+
+export async function createMatch(trackId) {
+  return request("POST", "/match/create", { trackId });
+}
+
+export async function getMatch(matchId) {
+  return request("GET", `/match/${matchId}`);
+}
+
+export async function startMatch(matchId) {
+  return request("POST", `/match/${matchId}/start`);
+}
+
+export async function restartMatch(matchId) {
+  return request("POST", `/match/${matchId}/restart`);
+}

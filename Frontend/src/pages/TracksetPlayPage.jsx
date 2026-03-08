@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import GameCanvas from "../components/GameCanvas";
 import useGameSocket from "../hooks/useGameSocket";
-import { getTrackset, runTrack, submitTrackset as apiSubmit, getLeaderboard } from "../api";
+import { getTrackset, runTrack, submitTrackset as apiSubmit, getLeaderboard, getMySubmissions, createMatch } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { neon, bg, border, text, font, glow, neonCodeTheme } from "../theme";
 import playIcon from "../assets/play.png";
@@ -15,18 +15,62 @@ const PLACEHOLDER_CODE = `# ─── CodeRace Bot ─────────�
 # Write a  drive(state)  function that is called every tick.
 # Collect all checkpoints in order, then cross the finish line!
 #
+# ── Controls ────────────────────────────────────────────────
 # Return: {"w": bool, "a": bool, "s": bool, "d": bool}
 #   w = accelerate, s = brake, a = steer left, d = steer right
+#
+# ── State ───────────────────────────────────────────────────
+# state.car.x/y/heading/speed/lateralV/steerAngle/drifting/surface
+# state.surface.name/grip/drag_mult/speed_mult
+# state.race.checkpointsHit/totalCheckpoints/finished
+# state.raycasts[0..4]  → .distance .surface .endX .endY
+#   [0]=forward  [1]=left45  [2]=right45  [3]=left90  [4]=right90
+#
+# ── Helpers (built-in) ──────────────────────────────────────
+# ray_forward(state), ray_left_45(state), ray_right_45(state)
+# ray_left_90(state), ray_right_90(state), rays(state)
+# angle_to_checkpoint(state)    → signed angle to next target
+# distance_to_checkpoint(state) → distance to next target
+# normalize_angle(a)            → clamp to [-π, π]
+#
+# ── Globals (set once) ──────────────────────────────────────
+# TRACK, CHECKPOINTS, FINISH, WORLD, TICK_RATE, DT
 # ─────────────────────────────────────────────────────────────
 
 def drive(state):
-    return {"w": True, "a": False, "s": False, "d": False}
+    # Steer toward next checkpoint
+    angle = angle_to_checkpoint(state)
+    steer_left = angle < -0.05
+    steer_right = angle > 0.05
+
+    # Use raycasts to stay on the road
+    fwd, l45, r45, l90, r90 = rays(state)
+
+    # If a side is much closer, steer away from it
+    if l90 < 40:
+        steer_right = True
+        steer_left = False
+    elif r90 < 40:
+        steer_left = True
+        steer_right = False
+
+    # Brake if wall is close ahead
+    brake = fwd < 80 and abs(state.car.speed) > 100
+
+    # Accelerate unless braking
+    return {
+        "w": not brake,
+        "a": steer_left,
+        "s": brake,
+        "d": steer_right,
+    }
 `;
 
 const TICK_RATE = 60;
 
 export default function TracksetPlayPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   // ── Trackset data ─────────────────────────────────────────────────
@@ -58,6 +102,9 @@ export default function TracksetPlayPage() {
 
   // ── Leaderboard ───────────────────────────────────────────────────
   const [leaderboard, setLeaderboard] = useState([]);
+
+  // ── Submissions history ───────────────────────────────────────────
+  const [submissions, setSubmissions] = useState([]);
 
   // ── WASD live mode (admin) ────────────────────────────────────────
   const [wasdMode, setWasdMode] = useState(false);
@@ -93,6 +140,9 @@ export default function TracksetPlayPage() {
       .catch((e) => setLoadError(e.message));
     getLeaderboard(id)
       .then((data) => setLeaderboard(data || []))
+      .catch(() => {});
+    getMySubmissions(id)
+      .then((data) => setSubmissions(data || []))
       .catch(() => {});
   }, [id]);
 
@@ -150,12 +200,27 @@ export default function TracksetPlayPage() {
       getLeaderboard(id)
         .then((lb) => setLeaderboard(lb || []))
         .catch(() => {});
+      getMySubmissions(id)
+        .then((s) => setSubmissions(s || []))
+        .catch(() => {});
     } catch (e) {
       setError(e.message);
     } finally {
       setSubmitting(false);
     }
   }, [code, id]);
+
+  // ── Create multiplayer match ──────────────────────────────────────
+
+  const handleCreateMatch = useCallback(async () => {
+    if (!currentTrackId) return;
+    try {
+      const data = await createMatch(currentTrackId);
+      navigate(`/match/${data.matchId}`);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [currentTrackId, navigate]);
 
   // ── Playback loop ─────────────────────────────────────────────────
 
@@ -489,6 +554,12 @@ export default function TracksetPlayPage() {
               >
                 🏆 Board
               </button>
+              <button
+                onClick={() => setRightTab("submissions")}
+                style={{ ...S.tab, ...(rightTab === "submissions" ? S.tabActive : {}) }}
+              >
+                📋 History
+              </button>
               {user?.isAdmin && (
                 <button
                   style={{
@@ -522,7 +593,7 @@ export default function TracksetPlayPage() {
                 }}
                 style={{ height: "100%", fontSize: 14 }}
               />
-            ) : (
+            ) : rightTab === "leaderboard" ? (
               <div style={S.lbContent}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: neon.orange, fontFamily: font.mono, marginBottom: 16 }}>
                   🏆 Leaderboard
@@ -539,6 +610,74 @@ export default function TracksetPlayPage() {
                         <span style={S.lbTime}>{e.totalTime.toFixed(3)}s</span>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Submissions History tab ─────────────────────────── */
+              <div style={S.lbContent}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: neon.blue, fontFamily: font.mono, marginBottom: 16 }}>
+                  📋 Submission History
+                </div>
+                {submissions.length === 0 ? (
+                  <p style={{ color: text.muted, fontSize: 12, fontFamily: font.mono }}>No submissions yet. Hit 🚀 Submit All to record your first attempt!</p>
+                ) : (
+                  <div style={S.lbList}>
+                    {submissions.map((sub) => {
+                      const times = (() => { try { return typeof sub.times === "string" ? JSON.parse(sub.times) : (sub.times || []); } catch { return []; } })();
+                      return (
+                        <div
+                          key={sub.id}
+                          style={{
+                            ...S.subRow,
+                            borderColor: sub.allFinished ? "rgba(132,204,22,0.2)" : "rgba(228,111,255,0.15)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: sub.allFinished ? neon.green : neon.purple }}>
+                              {sub.allFinished ? "✅ Passed" : "❌ Failed"}
+                            </span>
+                            <span style={{ fontSize: 10, color: text.dim, marginLeft: "auto" }}>
+                              {new Date(sub.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                            {sub.allFinished && (
+                              <>
+                                <span style={{ fontSize: 11, color: neon.green, fontWeight: 700 }}>Score: {sub.score}</span>
+                                <span style={{ fontSize: 11, color: text.muted }}>Total: {sub.totalTime.toFixed(3)}s</span>
+                              </>
+                            )}
+                            {!sub.allFinished && sub.reason && (
+                              <span style={{ fontSize: 11, color: neon.purple }}>{sub.reason}</span>
+                            )}
+                          </div>
+                          {times.length > 0 && (
+                            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                              {times.map((t, i) => (
+                                <span key={i} style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                  background: t > 0 ? "rgba(132,204,22,0.08)" : "rgba(228,111,255,0.08)",
+                                  color: t > 0 ? neon.green : neon.purple,
+                                  border: `1px solid ${t > 0 ? "rgba(132,204,22,0.15)" : "rgba(228,111,255,0.15)"}`,
+                                  fontFamily: font.mono,
+                                }}>
+                                  T{i + 1}: {t > 0 ? `${t.toFixed(3)}s` : "—"}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            style={S.loadCodeBtn}
+                            onClick={() => { setCode(sub.code); setRightTab("code"); }}
+                          >
+                            ↩ Load Code
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -563,6 +702,16 @@ export default function TracksetPlayPage() {
                   disabled={loading || submitting || cooldown}
                 >
                   {submitting ? "⏳ Submitting…" : cooldown ? "⏳ Wait…" : "🚀 Submit All"}
+                </button>
+              )}
+              {user && (
+                <button
+                  style={{ ...S.actionBtn, background: neon.blue, color: "#000" }}
+                  onClick={handleCreateMatch}
+                  disabled={loading || submitting}
+                  title="Create a multiplayer race on this track"
+                >
+                  🏎️ Race
                 </button>
               )}
             </div>
@@ -843,5 +992,30 @@ const S = {
     padding: "4px 8px",
     background: "#170818",
     borderRadius: 4,
+  },
+  subRow: {
+    display: "flex",
+    flexDirection: "column",
+    padding: "10px 12px",
+    background: bg.panel,
+    borderRadius: 6,
+    fontSize: 12,
+    fontFamily: font.mono,
+    border: `1px solid ${border.default}`,
+    transition: "border-color 0.15s ease",
+  },
+  loadCodeBtn: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    background: "rgba(0,165,255,0.08)",
+    color: neon.blue,
+    border: "1px solid rgba(0,165,255,0.2)",
+    borderRadius: 4,
+    padding: "3px 10px",
+    fontSize: 10,
+    fontFamily: font.mono,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.15s ease",
   },
 };
