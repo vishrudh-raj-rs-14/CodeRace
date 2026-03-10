@@ -6,16 +6,15 @@ on:
       - main
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build-check:
+    name: Build Check
     runs-on: ubuntu-latest
 
     steps:
-      # ─── CHECKOUT ────────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ─── BUILD FRONTEND ──────────────────────────────────────────
+      # ─── CHECK FRONTEND ──────────────────────────────────────────
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -31,7 +30,7 @@ jobs:
         working-directory: Frontend
         run: npm run build
 
-      # ─── BUILD BACKEND DOCKER IMAGE (prod Dockerfile) ────────────
+      # ─── CHECK BACKEND ───────────────────────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -39,32 +38,12 @@ jobs:
         working-directory: Backend
         run: docker build -f Dockerfile -t d1-backend:latest .
 
-      - name: Save Docker image as tarball
-        run: docker save d1-backend:latest | gzip > /tmp/d1-backend.tar.gz
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build-check        # only runs if build-check passes
 
-      # ─── COPY FILES TO SERVER ────────────────────────────────────
-      - name: Copy frontend build to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: "Frontend/dist/"
-          target: "/var/www/d1/Frontend"
-          strip_components: 2
-
-      - name: Copy Docker image to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: "/tmp/d1-backend.tar.gz"
-          target: "/tmp/"
-
-      # ─── DEPLOY ON SERVER ────────────────────────────────────────
+    steps:
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -75,14 +54,19 @@ jobs:
           script: |
             set -e
 
-            echo "=== Loading Docker image ==="
-            docker load < /tmp/d1-backend.tar.gz
-            rm /tmp/d1-backend.tar.gz
+            echo "=== Pulling latest code ==="
+            cd /var/www/d1
+            git pull origin main
 
-            echo "=== Restarting backend ==="
+            echo "=== Building frontend ==="
+            cd /var/www/d1/Frontend
+            npm ci
+            npm run build
+
+            echo "=== Building & restarting backend ==="
             cd /var/www/d1/Backend
             docker compose -f docker-compose.yml down
-            docker compose -f docker-compose.yml up -d
+            docker compose -f docker-compose.yml up -d --build
 
             echo "=== Fixing permissions ==="
             sudo /usr/local/bin/d1-deploy-perms
