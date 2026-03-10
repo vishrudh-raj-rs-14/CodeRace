@@ -81,8 +81,8 @@ jobs:
 
             echo "=== Restarting backend ==="
             cd /var/www/d1/Backend
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.yml down
+            docker compose -f docker-compose.yml up -d
 
             echo "=== Fixing permissions ==="
             sudo /usr/local/bin/d1-deploy-perms
