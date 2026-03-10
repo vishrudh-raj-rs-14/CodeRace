@@ -1,5 +1,4 @@
-
-#build nsjail
+# ---------- Stage 1: Build nsjail ----------
 FROM debian:bookworm-slim AS nsjail
 WORKDIR /app
 RUN apt-get update && \
@@ -23,38 +22,30 @@ RUN git clone https://github.com/google/nsjail.git .
 RUN make -j
 
 
-# ---------- Stage 2: Build Go server ----------
-FROM golang AS go-builder
+# ---------- Stage 2: Dev runtime with Go + Air + nsjail ----------
+FROM golang:latest
 
-WORKDIR /app
-COPY ./go.mod ./go.sum ./
-RUN go mod download
-
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server
-
-
-# ---------- Stage 3: Final runtime ----------
-FROM ubuntu:latest
-
-RUN apt update && apt install -y \
+RUN apt-get update && apt-get install -y \
     libprotobuf-dev \
     libnl-route-3-200 \
     ca-certificates \
-    python3
+    python3 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install Air for hot reload
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
-# Copy nsjail
 
-COPY --from=go-builder /app/ ./
+# Copy nsjail binary to a path OUTSIDE /app so the dev volume mount
+# ( .:/app ) cannot shadow it.
+COPY --from=nsjail /app/nsjail /usr/local/bin/nsjail
 
-COPY --from=nsjail /usr/lib/*-linux-gnu/libprotobuf.so.32 /usr/lib/*-linux-gnu/libnl-route-3.so.200 \
-  /lib/*-linux-gnu/libnl-3.so.200 /lib/*-linux-gnu/libz.so.1 /usr/lib/*-linux-gnu/libstdc++.so.6 \
-  /lib/*-linux-gnu/libgcc_s.so.1 /lib/
+# Copy go.mod and go.sum first for dependency caching
+COPY go.mod go.sum ./
+RUN go mod download
 
-COPY --from=nsjail /app/nsjail /app/nsjail/
-
-
-EXPOSE 8080
+# Source code will be mounted as a volume — no COPY needed
+EXPOSE 3000
 
 CMD ["./server"]

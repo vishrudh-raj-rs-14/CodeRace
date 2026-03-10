@@ -31,13 +31,13 @@ jobs:
         working-directory: Frontend
         run: npm run build
 
-      # ─── BUILD BACKEND DOCKER IMAGE ──────────────────────────────
+      # ─── BUILD BACKEND DOCKER IMAGE (prod Dockerfile) ────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build backend Docker image
         working-directory: Backend
-        run: docker build -t d1-backend:latest .
+        run: docker build -f Dockerfile -t d1-backend:latest .
 
       - name: Save Docker image as tarball
         run: docker save d1-backend:latest | gzip > /tmp/d1-backend.tar.gz
@@ -81,8 +81,8 @@ jobs:
 
             echo "=== Restarting backend ==="
             cd /var/www/d1/Backend
-            docker compose down
-            docker compose up -d
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d
 
             echo "=== Fixing permissions ==="
             sudo /usr/local/bin/d1-deploy-perms

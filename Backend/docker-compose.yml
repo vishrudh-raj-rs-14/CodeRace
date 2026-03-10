@@ -21,7 +21,7 @@ services:
   my-server:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     cgroup: host
     container_name: my-server
     privileged: true
