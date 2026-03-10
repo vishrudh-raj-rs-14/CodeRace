@@ -76,7 +76,7 @@ When all players finish (or 30s elapses), results are shown:
 
 ### Protocol
 
-**WebSocket endpoint:** `ws://host/api/match/:id/ws?userId=<id>&name=<name>`
+**WebSocket endpoint:** `wss://host/api/match/:id/ws?userId=<id>&name=<name>`
 
 **Client → Server:** WASD input at 60 Hz
 ```json

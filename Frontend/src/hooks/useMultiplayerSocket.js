@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 /**
  * Custom hook for multiplayer match WebSocket.
  *
- * Connects to ws://host/api/match/:matchId/ws?userId=...&name=...
+ * Connects to wss://host/api/match/:matchId/ws?userId=...&name=...
  * Streams WASD input and receives match frames with other cars.
  * Also supports sending control messages (restart_vote, exit).
  *
@@ -78,7 +78,7 @@ export default function useMultiplayerSocket({ matchId, userId, name, enabled = 
     }
 
     const qs = `?userId=${encodeURIComponent(userId)}&name=${encodeURIComponent(name || "Player")}`;
-    const url = `ws://${window.location.host}/api/match/${matchId}/ws${qs}`;
+    const url = `wss://${window.location.host}/api/match/${matchId}/ws${qs}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
