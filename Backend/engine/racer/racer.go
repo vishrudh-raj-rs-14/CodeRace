@@ -27,16 +27,18 @@ const (
 	CarH = 44
 
 	// Wheelbase (distance between front and rear axle).
-	Wheelbase = 38.0
+	Wheelbase = 46.0
 
 	// ── engine / drivetrain ──────────────────────────────────────────────
-	EngineForce   = 480.0  // forward acceleration (px/s²)
-	BrakeForce    = 750.0  // braking deceleration (px/s²)
-	ReversePower  = 200.0  // reverse acceleration
-	MaxSpeed      = 580.0  // forward top speed (px/s)
-	MaxReverseSpd = 140.0  // reverse top speed
-	DragCoeff     = 0.0012 // air drag ∝ v²
-	RollingFrict  = 22.0   // base rolling friction (px/s²)
+	EngineForce     = 520.0   // acceleration in low-speed band (px/s²)
+	EngineForceHigh = 120.0   // acceleration in high-speed band (px/s²)
+	PowerBandKnee   = 480.0   // speed where power band transitions
+	BrakeForce      = 750.0   // braking deceleration (px/s²)
+	ReversePower    = 200.0   // reverse acceleration
+	MaxSpeed        = 960.0   // forward top speed (px/s)
+	MaxReverseSpd   = 160.0   // reverse top speed
+	DragCoeff       = 0.00015 // air drag ∝ v²
+	RollingFrict    = 22.0    // base rolling friction (px/s²)
 
 	// ── steering ─────────────────────────────────────────────────────────
 	MaxSteerAngle = 33.0 * (math.Pi / 180) // max wheel angle (radians)
@@ -44,22 +46,30 @@ const (
 	SteerReturn   = 8.0                    // wheel self-centre rate (rad/s)
 
 	// ── traction / grip ──────────────────────────────────────────────────
-	// MaxLateralG is the maximum lateral acceleration (px/s²) that the
-	// tyres can exert to kill sideways velocity, at full surface grip.
-	// This is the CORE of the slip model.  When a turn generates more
-	// lateral velocity than the tyres can absorb, the excess persists
-	// as a slide / drift.
-	MaxLateralG = 2200.0
+	// TractionCoeff is the cornering stiffness — how quickly traction
+	// force builds with lateral velocity (proportional region).
+	TractionCoeff = 15.0
 
-	// DriftDamping is extra per-second damping on lateral velocity while
-	// sliding, so drifts don't last forever.
-	DriftDamping = 2.5
+	// MaxTractionForce is the peak lateral force (px/s²) the tyres can
+	// exert at full surface grip (saturation cap of the tyre curve).
+	MaxTractionForce = 2200.0
+
+	// DriveGripScale controls how much surface grip affects throttle and
+	// brake force at low speed.  At standstill driveGrip = min(1, grip ×
+	// DriveGripScale); as speed rises the penalty fades away so the car
+	// can still reach full top speed on any surface.
+	DriveGripScale = 2.5
 
 	// Minimum lateral velocity to flag as "drifting" (avoids flicker).
 	DriftThreshold = 25.0
 
 	// BrakeGripPenalty – braking while turning reduces available grip.
-	BrakeGripPenalty = 0.45
+	BrakeGripPenalty = 0.25
+
+	// BrakeDriftBoost – extra heading rotation rate (rad/s) the rear end
+	// gains when the driver brakes while steering above BrakeDriftMinSpd.
+	BrakeDriftBoost  = 1.8
+	BrakeDriftMinSpd = 120.0
 
 	// WallBounce – fraction of velocity kept on wall hit (negative = bounce).
 	WallBounce = -0.3
@@ -72,7 +82,7 @@ type SurfaceType int
 const (
 	SurfaceRoad SurfaceType = iota
 	SurfaceGrass
-	SurfaceSand
+	SurfaceDirt
 	SurfaceIce
 	SurfaceWall
 )
@@ -87,8 +97,8 @@ type SurfaceProps struct {
 
 var Surfaces = map[SurfaceType]SurfaceProps{
 	SurfaceRoad:  {Grip: 1.00, DragMult: 1.0, SpeedMult: 1.00, Color: "#555566", Name: "road"},
-	SurfaceGrass: {Grip: 0.45, DragMult: 2.2, SpeedMult: 0.65, Color: "#2d5a27", Name: "grass"},
-	SurfaceSand:  {Grip: 0.28, DragMult: 3.5, SpeedMult: 0.45, Color: "#c2b280", Name: "sand"},
+	SurfaceGrass: {Grip: 0.45, DragMult: 3.0, SpeedMult: 0.50, Color: "#2d5a27", Name: "grass"},
+	SurfaceDirt:  {Grip: 0.35, DragMult: 3.5, SpeedMult: 0.60, Color: "#8B7355", Name: "dirt"},
 	SurfaceIce:   {Grip: 0.07, DragMult: 0.3, SpeedMult: 1.00, Color: "#b8e0f0", Name: "ice"},
 	SurfaceWall:  {Grip: 0.00, DragMult: 0.0, SpeedMult: 0.00, Color: "#333344", Name: "wall"},
 }
@@ -97,7 +107,8 @@ var Surfaces = map[SurfaceType]SurfaceProps{
 var SurfaceByName = map[string]SurfaceType{
 	"road":  SurfaceRoad,
 	"grass": SurfaceGrass,
-	"sand":  SurfaceSand,
+	"dirt":  SurfaceDirt,
+	"sand":  SurfaceDirt, // backward compat: old tracks stored "sand"
 	"ice":   SurfaceIce,
 	"wall":  SurfaceWall,
 }
@@ -161,7 +172,7 @@ func DefaultTrack() []TrackRect {
 	return []TrackRect{
 		// ── quadrant background fills (painted first) ────────────────────
 		{X: 0, Y: 0, W: 4000, H: 4000, Surface: SurfaceIce},         // NW
-		{X: 4000, Y: 0, W: 4000, H: 4000, Surface: SurfaceSand},     // NE
+		{X: 4000, Y: 0, W: 4000, H: 4000, Surface: SurfaceDirt},     // NE
 		{X: 0, Y: 4000, W: 4000, H: 4000, Surface: SurfaceGrass},    // SW
 		{X: 4000, Y: 4000, W: 4000, H: 4000, Surface: SurfaceGrass}, // SE
 
@@ -595,27 +606,26 @@ func (r *Racer) loop() {
 //
 // Two-force tyre model:
 //
-//  1. THRUST – engine force along the tyre heading (forward axis).
-//     Accelerates/decelerates the car.  Resisted by air drag and
-//     rolling friction.
+//  1. THRUST – engine force along the FRONT WHEEL direction (heading +
+//     steerAngle).  This means steering naturally assists turns because
+//     the engine pushes where the wheels point.
 //
-//  2. GRIP – lateral force perpendicular to the tyres that prevents
-//     the car from sliding sideways.  It has a MAXIMUM (depends on
-//     surface grip).  When a turn generates more lateral velocity than
-//     the tyres can absorb, the excess persists → the car drifts /
-//     understeers.
+//  2. TRACTION – lateral force perpendicular to the car body that
+//     resists sideways motion.  The force is proportional to lateral
+//     velocity up to a saturation cap that depends on surface grip:
+//       tractionForce = min(TractionCoeff × |latV|,
+//                           MaxTractionForce × surface.grip)
+//     Below the cap → clean cornering.  Above → the excess lateral
+//     velocity persists as drift / understeer.
 //
 // This means:
 //   • On road you can corner cleanly at moderate speed but must brake
-//     for sharp turns at high speed (grip limit exceeded).
-//   • On ice the grip limit is tiny, so any steering at speed causes
-//     the car to keep sliding in the original direction.
-//   • Braking while turning further reduces grip → brake-initiated
-//     drifts.
-//
-// The car does NOT artificially slow down when turning.  Speed only
-// changes from engine, drag, and friction.  The *direction* of
-// velocity changes based on how much grip the tyres have.
+//     for sharp turns at high speed (traction saturates).
+//   • On ice the traction cap is tiny (0.07 × 2800 = 196), so any
+//     steering at speed causes the car to keep sliding in the original
+//     direction, slowly turning.
+//   • Dirt/grass require braking for U-turns at speed.
+//   • Braking while turning reduces traction further (BrakeGripPenalty).
 
 func (r *Racer) update() {
 	r.mu.RLock()
@@ -648,16 +658,37 @@ func (r *Racer) update() {
 
 	// At high speed the effective steer is reduced (narrower turning arc).
 	speedRatio := math.Min(speed/MaxSpeed, 1.0)
-	effectiveSteer := c.SteerAngle * (1.0 - 0.35*speedRatio)
+	effectiveSteer := c.SteerAngle * (1.0 - 0.3*speedRatio)
 
 	// Turn the heading via bicycle model.
 	if speed > 0.5 {
 		turnRadius := Wheelbase / math.Tan(math.Abs(effectiveSteer)+0.001)
 		angVel := speed / turnRadius
+
+		// Grip-limited angular velocity.  For circular motion the required
+		// lateral acceleration is a = v × ω.  The tyres can supply at most
+		// MaxTractionForce × grip, so ω_max = MaxTractionForce × grip / v.
+		// At low speed the cap is huge (sharp turns easy); at high speed
+		// the cap shrinks → car understeers → must brake or drift.
+		// Use a floor of 0.4 on grip so the heading always turns
+		// reasonably — traction (step 5) still limits actual velocity change.
+		steerGrip := math.Max(surf.Grip, 0.4)
+		maxAngVel := MaxTractionForce * steerGrip / speed
+		if angVel > maxAngVel {
+			angVel = maxAngVel
+		}
+
 		if effectiveSteer < 0 {
 			angVel = -angVel
 		}
 		c.Heading += angVel * dt
+		c.Heading = normalizeAngle(c.Heading)
+	}
+
+	// Brake-drift: braking while steering at speed kicks the rear end out.
+	if input.S && math.Abs(c.SteerAngle) > MaxSteerAngle*0.3 && speed > BrakeDriftMinSpd {
+		boost := BrakeDriftBoost * (speed / MaxSpeed) * surf.Grip
+		c.Heading += sign(effectiveSteer) * boost * dt
 		c.Heading = normalizeAngle(c.Heading)
 	}
 
@@ -671,31 +702,57 @@ func (r *Racer) update() {
 	fwdSpeed := r.velX*fwdX + r.velY*fwdY
 	latSpeed := r.velX*latX + r.velY*latY
 
-	// ── 3. engine / brake (along forward axis only) ─────────────────────
+	// ── 3. engine / brake ───────────────────────────────────────────────
+	// Thrust is applied along the WHEEL direction (heading + effectiveSteer),
+	// so steering naturally assists in changing direction of travel.
+	// On low-grip surfaces wheels slip → reduced effective force.
 
+	// driveGrip: at low speed wheels slip on low-grip surfaces; as speed
+	// builds the penalty fades so the car can still reach full top speed.
+	driveGripBase := math.Min(1.0, surf.Grip*DriveGripScale)
+	speedFrac := math.Min(speed/(MaxSpeed*0.5), 1.0)
+	driveGrip := driveGripBase + (1.0-driveGripBase)*speedFrac
 	braking := false
 
 	if input.W {
 		topSpd := MaxSpeed * surf.SpeedMult
-		if fwdSpeed < topSpd {
-			fwdSpeed += EngineForce * dt
-			if fwdSpeed > topSpd {
-				fwdSpeed = topSpd
+		// Two-phase power band: full force below knee, fades above.
+		var thrust float64
+		if speed < PowerBandKnee {
+			thrust = EngineForce
+		} else {
+			t := (speed - PowerBandKnee) / (topSpd - PowerBandKnee + 0.001)
+			if t > 1.0 {
+				t = 1.0
 			}
+			thrust = EngineForce + (EngineForceHigh-EngineForce)*t
+		}
+		// Wheel direction unit vector
+		wheelX := math.Cos(c.Heading + effectiveSteer)
+		wheelY := math.Sin(c.Heading + effectiveSteer)
+		// Apply thrust along wheel direction (scaled by drive grip)
+		r.velX += wheelX * thrust * driveGrip * dt
+		r.velY += wheelY * thrust * driveGrip * dt
+		// Re-decompose after thrust to check speed cap
+		fwdSpeed = r.velX*fwdX + r.velY*fwdY
+		latSpeed = r.velX*latX + r.velY*latY
+		// Cap forward speed to surface top speed
+		if fwdSpeed > topSpd {
+			fwdSpeed = topSpd
 		}
 	}
 
 	if input.S {
 		if fwdSpeed > 2.0 {
-			// Braking (opposing forward motion).
+			// Braking (opposing forward motion) along body heading.
 			braking = true
-			fwdSpeed -= BrakeForce * dt
+			fwdSpeed -= BrakeForce * driveGrip * dt
 			if fwdSpeed < 0 {
 				fwdSpeed = 0 // brake doesn't reverse
 			}
 		} else {
 			// Reverse.
-			fwdSpeed -= ReversePower * dt
+			fwdSpeed -= ReversePower * driveGrip * dt
 			if fwdSpeed < -MaxReverseSpd {
 				fwdSpeed = -MaxReverseSpd
 			}
@@ -714,27 +771,30 @@ func (r *Racer) update() {
 		fwdSpeed -= sign(fwdSpeed) * roll * dt
 	}
 
-	// ── 5. lateral grip (THE key force) ─────────────────────────────────
+	// ── 5. traction (THE key force) ─────────────────────────────────────
 	//
-	// gripBudget = maximum lateral velocity the tyres can absorb this tick.
-	// If |latSpeed| ≤ gripBudget → tyres fully correct it (clean turn).
-	// If |latSpeed| > gripBudget → excess lateral persists (drift/slide).
+	// Proportional + saturation cap model (simplified Pacejka):
+	//   tractionForce = min(TractionCoeff × |latSpeed|,
+	//                       MaxTractionForce × surface.grip)
+	// This means:
+	//   - Small slip angles: force ∝ slip → clean cornering
+	//   - Large slip angles: force capped → tire saturates → drift
 
 	gripMul := surf.Grip
 	if braking {
 		gripMul *= BrakeGripPenalty
 	}
 
-	gripBudget := MaxLateralG * gripMul * dt
+	tractionCap := MaxTractionForce * gripMul
+	tractionForce := math.Min(TractionCoeff*math.Abs(latSpeed), tractionCap)
+	latDelta := tractionForce * dt
 
-	if math.Abs(latSpeed) <= gripBudget {
-		// Tyres handle it – kill lateral velocity entirely.
+	if math.Abs(latSpeed) <= latDelta {
+		// Traction fully absorbs lateral velocity.
 		latSpeed = 0
 	} else {
-		// Tyres at limit – absorb what they can, rest is slide.
-		latSpeed -= sign(latSpeed) * gripBudget
-		// Extra damping so drifts settle over time.
-		latSpeed *= (1.0 - DriftDamping*dt)
+		// Traction partially absorbs — remainder is drift.
+		latSpeed -= sign(latSpeed) * latDelta
 	}
 
 	c.Drifting = math.Abs(latSpeed) > DriftThreshold

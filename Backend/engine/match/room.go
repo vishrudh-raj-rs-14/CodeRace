@@ -240,7 +240,7 @@ func (r *Room) runRace() {
 	ticker := time.NewTicker(time.Second / racer.TickRate)
 	defer ticker.Stop()
 
-	maxTicks := racer.TickRate * 30
+	maxTicks := racer.TickRate * 600 // 10 minutes
 
 	for tick := 0; tick < maxTicks; tick++ {
 		select {
