@@ -24,11 +24,18 @@ export default function NavBar() {
         <Link to="/playground" style={styles.link}>
           Playground
         </Link>
+        <Link to="/leaderboard" style={styles.link}>
+          Leaderboard
+        </Link>
+        <Link to="/guide" style={styles.link}>
+          Guide
+        </Link>
       </div>
 
       <div style={styles.right}>
         {user ? (
           <>
+            {user.picture && <img src={user.picture} alt="Profile" style={styles.avatar} />}
             <span style={styles.name}>{user.displayName}</span>
             {user.isAdmin && <span style={styles.badge}>admin</span>}
             <button onClick={handleLogout} style={styles.btn}>
@@ -36,14 +43,9 @@ export default function NavBar() {
             </button>
           </>
         ) : (
-          <>
-            <Link to="/login" style={styles.btn}>
-              Login
-            </Link>
-            <Link to="/register" style={{ ...styles.btn, background: neon.pink, color: "#fff", boxShadow: glow.pink }}>
-              Register
-            </Link>
-          </>
+          <Link to="/?login=true" style={{ ...styles.btn, background: neon.pink, color: "#fff", boxShadow: glow.pink }}>
+            Login / Signup
+          </Link>
         )}
       </div>
     </nav>
@@ -98,6 +100,13 @@ const styles = {
     fontWeight: 600,
     fontFamily: font.mono,
     textShadow: "0 0 6px rgba(132,204,22,0.25)",
+  },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: "50%",
+    border: `1px solid ${border.light}`,
+    objectFit: "cover",
   },
   badge: {
     fontSize: 9,

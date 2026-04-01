@@ -78,7 +78,8 @@ export default function useMultiplayerSocket({ matchId, userId, name, enabled = 
     }
 
     const qs = `?userId=${encodeURIComponent(userId)}&name=${encodeURIComponent(name || "Player")}`;
-    const url = `wss://${window.location.host}/api/match/${matchId}/ws${qs}`;
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${wsProto}://${window.location.host}/api/match/${matchId}/ws${qs}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

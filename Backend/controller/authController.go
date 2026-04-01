@@ -1,133 +1,101 @@
 package controller
 
 import (
+	"context"
 	"delta/codeRace/database"
 	"delta/codeRace/middleware"
 	"delta/codeRace/models"
-	"strings"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
-	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 )
 
-// ─── Register ────────────────────────────────────────────────────────────────
-
-type registerRequest struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	DisplayName string `json:"displayName"`
+type googleLoginRequest struct {
+	Credential string `json:"credential"`
 }
 
-func RegisterController(c *fiber.Ctx) error {
-	var req registerRequest
+func GoogleLoginController(c *fiber.Ctx) error {
+	var req googleLoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	req.DisplayName = strings.TrimSpace(req.DisplayName)
-
-	if req.Email == "" || req.Password == "" || req.DisplayName == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "email, password, and displayName are required"})
-	}
-	if len(req.Password) < 6 {
-		return c.Status(400).JSON(fiber.Map{"error": "password must be at least 6 characters"})
+	if req.Credential == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "credential missing"})
 	}
 
-	// Check for existing user.
-	var existing models.User
-	if err := database.DB.Where("email = ?", req.Email).First(&existing).Error; err == nil {
-		return c.Status(409).JSON(fiber.Map{"error": "email already registered"})
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	if clientID == "" {
+		return c.Status(500).JSON(fiber.Map{"error": "server misconfigured (GOOGLE_CLIENT_ID missing)"})
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	payload, err := idtoken.Validate(context.Background(), req.Credential, clientID)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to hash password"})
+		return c.Status(401).JSON(fiber.Map{"error": "invalid google token", "details": err.Error()})
 	}
 
-	// First user becomes admin.
-	var count int64
-	database.DB.Model(&models.User{}).Count(&count)
-
-	user := models.User{
-		Email:        req.Email,
-		PasswordHash: string(hash),
-		DisplayName:  req.DisplayName,
-		IsAdmin:      count == 0,
+	email := payload.Claims["email"].(string)
+	name := ""
+	if n, ok := payload.Claims["name"]; ok {
+		name = n.(string)
 	}
 
-	if err := database.DB.Create(&user).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
-	}
+	// Create a cool techy avatar using DiceBear Bottts based on the user's email
+	picture := "https://api.dicebear.com/7.x/bottts/svg?seed=" + email
 
-	token, err := middleware.GenerateToken(&user)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to generate token"})
-	}
-
-	return c.Status(201).JSON(fiber.Map{
-		"token": token,
-		"user": fiber.Map{
-			"id":          user.ID,
-			"email":       user.Email,
-			"displayName": user.DisplayName,
-			"isAdmin":     user.IsAdmin,
-		},
-	})
-}
-
-// ─── Login ───────────────────────────────────────────────────────────────────
-
-type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func LoginController(c *fiber.Ctx) error {
-	var req loginRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-
+	// Find or create user
 	var user models.User
-	if err := database.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid email or password"})
+	result := database.DB.Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		// Create new user
+		user = models.User{
+			Email:       email,
+			DisplayName: name,
+			Picture:     picture,
+		}
+		if err := database.DB.Create(&user).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "could not create user"})
+		}
+	} else {
+		// Update profile picture and name if they changed
+		user.DisplayName = name
+		user.Picture = picture
+		database.DB.Save(&user)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid email or password"})
-	}
-
-	token, err := middleware.GenerateToken(&user)
+	// Generate JWT
+	tokenStr, err := middleware.GenerateToken(&user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to generate token"})
 	}
 
 	return c.JSON(fiber.Map{
-		"token": token,
+		"token": tokenStr,
 		"user": fiber.Map{
 			"id":          user.ID,
 			"email":       user.Email,
 			"displayName": user.DisplayName,
+			"picture":     user.Picture,
 			"isAdmin":     user.IsAdmin,
 		},
 	})
 }
 
-// ─── Me (get current user) ──────────────────────────────────────────────────
-
+// MeController returns the currently authenticated user's profile.
 func MeController(c *fiber.Ctx) error {
 	userID := c.Locals("userID")
-	email := c.Locals("email")
-	displayName := c.Locals("displayName")
-	isAdmin := c.Locals("isAdmin")
+
+	var user models.User
+	if err := database.DB.First(&user, "id = ?", userID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
+	}
 
 	return c.JSON(fiber.Map{
-		"id":          userID,
-		"email":       email,
-		"displayName": displayName,
-		"isAdmin":     isAdmin,
+		"id":          user.ID,
+		"email":       user.Email,
+		"displayName": user.DisplayName,
+		"picture":     user.Picture,
+		"isAdmin":     user.IsAdmin,
 	})
 }

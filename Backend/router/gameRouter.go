@@ -30,8 +30,9 @@ func SetupGameRoutes(app fiber.Router) {
 	gameApi.Post("/submit", middleware.RequireAuth, controller.SubmitTracksetController)
 }
 
-// SetupLeaderboardRoutes attaches leaderboard endpoints under /api/tracksets/:id.
+// SetupLeaderboardRoutes attaches leaderboard endpoints under /api/tracksets/:id and /api/leaderboard.
 func SetupLeaderboardRoutes(api fiber.Router) {
+	api.Get("/leaderboard", controller.GlobalLeaderboardController)
 	api.Get("/tracksets/:id/leaderboard", controller.LeaderboardController)
 	api.Get("/tracksets/:id/my-score", middleware.RequireAuth, controller.MyScoreController)
 	api.Get("/tracksets/:id/my-submissions", middleware.RequireAuth, controller.MySubmissionsController)

@@ -1,0 +1,35 @@
+{
+  "track": {
+    "worldW": 4000,
+    "worldH": 2000,
+    "startX": 200,
+    "startY": 1000,
+    "startHeading": 0,
+    "rects": [
+      { "x": 0,    "y": 0,    "w": 4000, "h": 2000, "surface": "grass" },
+      { "x": 100,  "y": 800,  "w": 800,  "h": 400,  "surface": "road"  },
+      { "x": 900,  "y": 800,  "w": 800,  "h": 400,  "surface": "ice"   },
+      { "x": 1700, "y": 800,  "w": 800,  "h": 400,  "surface": "dirt"  },
+      { "x": 2500, "y": 400,  "w": 400,  "h": 1200, "surface": "road"  },
+      { "x": 2900, "y": 400,  "w": 800,  "h": 400,  "surface": "road"  },
+      { "x": 3500, "y": 200,  "w": 200,  "h": 400,  "surface": "wall"  }
+    ]
+  },
+  "inputSequence": [
+    { "fromTick": 0,   "toTick": 59,  "input": { "w": true,  "a": false, "s": false, "d": false }, "comment": "Straight acceleration on road" },
+    { "fromTick": 60,  "toTick": 89,  "input": { "w": true,  "a": false, "s": false, "d": true  }, "comment": "Right turn on road at speed" },
+    { "fromTick": 90,  "toTick": 119, "input": { "w": true,  "a": true,  "s": false, "d": false }, "comment": "Left turn to straighten on road" },
+    { "fromTick": 120, "toTick": 149, "input": { "w": true,  "a": false, "s": false, "d": false }, "comment": "Straight into ice zone" },
+    { "fromTick": 150, "toTick": 179, "input": { "w": true,  "a": false, "s": false, "d": true  }, "comment": "Attempt right turn on ice (should slide)" },
+    { "fromTick": 180, "toTick": 209, "input": { "w": false, "a": false, "s": true,  "d": true  }, "comment": "Brake + turn on ice" },
+    { "fromTick": 210, "toTick": 239, "input": { "w": true,  "a": false, "s": false, "d": false }, "comment": "Accelerate into dirt zone" },
+    { "fromTick": 240, "toTick": 269, "input": { "w": true,  "a": false, "s": false, "d": true  }, "comment": "Turn on dirt at speed" },
+    { "fromTick": 270, "toTick": 299, "input": { "w": false, "a": true,  "s": true,  "d": false }, "comment": "Brake + left turn on dirt (U-turn attempt)" },
+    { "fromTick": 300, "toTick": 329, "input": { "w": true,  "a": true,  "s": false, "d": false }, "comment": "Accelerate out of U-turn" },
+    { "fromTick": 330, "toTick": 359, "input": { "w": true,  "a": false, "s": false, "d": false }, "comment": "Straight toward wall" },
+    { "fromTick": 360, "toTick": 389, "input": { "w": false, "a": false, "s": false, "d": false }, "comment": "Coast (post wall-collision settling)" },
+    { "fromTick": 390, "toTick": 419, "input": { "w": true,  "a": false, "s": true,  "d": false }, "comment": "Throttle + brake simultaneously" },
+    { "fromTick": 420, "toTick": 449, "input": { "w": false, "a": false, "s": false, "d": false }, "comment": "Coast to settle" }
+  ],
+  "totalTicks": 450
+}

@@ -9,7 +9,10 @@ import (
 
 func SetupAuthRoutes(api fiber.Router) {
 	auth := api.Group("/auth")
-	auth.Post("/register", controller.RegisterController)
-	auth.Post("/login", controller.LoginController)
+
+	// Google OAuth endpoint
+	auth.Post("/google", controller.GoogleLoginController)
+
+	// Get self profile
 	auth.Get("/me", middleware.RequireAuth, controller.MeController)
 }

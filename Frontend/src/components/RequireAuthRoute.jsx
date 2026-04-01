@@ -29,7 +29,7 @@ export default function RequireAuthRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/?error=unauthorized" state={{ from: location.pathname }} replace />;
   }
 
   return children;

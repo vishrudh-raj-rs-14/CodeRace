@@ -10,7 +10,7 @@ carImg.src = carAsset;
 const SURFACES = [
   { name: "road",  color: "#555566", label: "🛣️ Road" },
   { name: "grass", color: "#2d5a27", label: "🌿 Grass" },
-  { name: "sand",  color: "#c2b280", label: "🏜️ Sand" },
+  { name: "dirt",  color: "#8B7355", label: "🟤 Dirt" },
   { name: "ice",   color: "#b8e0f0", label: "❄️ Ice" },
   { name: "wall",  color: "#333344", label: "🧱 Wall" },
 ];

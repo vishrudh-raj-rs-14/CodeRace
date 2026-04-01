@@ -11,12 +11,12 @@ import (
 // ─── User ────────────────────────────────────────────────────────────────────
 
 type User struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash string    `gorm:"not null" json:"-"`
-	DisplayName  string    `gorm:"not null" json:"displayName"`
-	IsAdmin      bool      `gorm:"default:false" json:"isAdmin"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Email       string    `gorm:"uniqueIndex;not null" json:"email"`
+	DisplayName string    `gorm:"not null" json:"displayName"`
+	Picture     string    `gorm:"" json:"picture"`
+	IsAdmin     bool      `gorm:"default:false" json:"isAdmin"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {

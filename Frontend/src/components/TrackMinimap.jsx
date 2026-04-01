@@ -11,7 +11,7 @@ import { useRef, useEffect } from "react";
 const SURFACE_COLORS = {
   road:  "#555566",
   grass: "#2d5a27",
-  sand:  "#c2b280",
+  dirt:  "#8B7355",
   ice:   "#b8e0f0",
   wall:  "#333344",
 };

@@ -52,18 +52,8 @@ async function request(method, path, body) {
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function register(email, password, displayName) {
-  const data = await request("POST", "/auth/register", {
-    email,
-    password,
-    displayName,
-  });
-  setToken(data.token);
-  return data.user;
-}
-
-export async function login(email, password) {
-  const data = await request("POST", "/auth/login", { email, password });
+export async function googleLogin(credential) {
+  const data = await request("POST", "/auth/google", { credential });
   setToken(data.token);
   return data.user;
 }
@@ -148,4 +138,8 @@ export async function startMatch(matchId) {
 
 export async function restartMatch(matchId) {
   return request("POST", `/match/${matchId}/restart`);
+}
+
+export async function getGlobalLeaderboard(limit = 50) {
+  return request("GET", `/leaderboard?limit=${limit}`);
 }

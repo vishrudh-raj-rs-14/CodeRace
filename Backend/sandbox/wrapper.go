@@ -36,7 +36,7 @@ package sandbox
 //	angle_to_checkpoint(state)  float – signed angle to next CP/finish (rad)
 //	distance_to_checkpoint(state) float – distance to next CP/finish (px)
 //	normalize_angle(a)          float – normalize angle to [-π, π]
-//	next_checkpoint_center(state) (x,y) or None – centre of next target
+//	next_checkpoint_center(state) (x,y) or None – centre of next target//      get_all_checkpoints()       list  – all checkpoints sorted by order//
 //
 // Globals (set once before the first drive() call):
 //
@@ -174,6 +174,10 @@ def angle_to_checkpoint(state):
 def next_checkpoint_center(state):
     """Return (x, y) centre of the next target, or None."""
     return _current_target(state)
+
+def get_all_checkpoints():
+    """Return a list of all checkpoints sorted by order."""
+    return sorted(CHECKPOINTS, key=lambda c: c.order)
 
 
 # ─── Your code ───────────────────────────────────────────────────────────

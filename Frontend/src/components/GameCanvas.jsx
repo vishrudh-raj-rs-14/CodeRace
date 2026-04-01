@@ -252,7 +252,8 @@ function renderPreview(canvas, td) {
 const SURFACE_COLORS = {
   road:  "#555566",
   grass: "#2d5a27",
-  sand:  "#c2b280",
+  dirt:  "#8B7355",
+  sand:  "#8B7355", // backward compat
   ice:   "#b8e0f0",
   wall:  "#333344",
 };
@@ -509,7 +510,7 @@ function renderFrame(canvas, frame) {
 
   // Speed bar
   const barW = 200;
-  const barFill = Math.min(Math.abs(car.speed) / 580, 1.0) * barW;
+  const barFill = Math.min(Math.abs(car.speed) / 960, 1.0) * barW;
   ctx.fillStyle = "rgba(255,255,255,0.06)";
   roundRect(ctx, hudX, hudY - 12, barW, 12, 3);
   ctx.fill();

@@ -68,7 +68,8 @@ export default function useGameSocket({ trackId, enabled = true } = {}) {
     }
 
     const qs = trackId ? `?trackId=${trackId}` : "";
-    const url = `wss://${window.location.host}/api/game/ws${qs}`;
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${wsProto}://${window.location.host}/api/game/ws${qs}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

@@ -93,3 +93,47 @@ func MySubmissionsController(c *fiber.Ctx) error {
 
 	return c.JSON(subs)
 }
+
+// GlobalLeaderboardController returns the top scores across all official tracksets.
+// GET /api/leaderboard
+func GlobalLeaderboardController(c *fiber.Ctx) error {
+	limit := c.QueryInt("limit", 50)
+	if limit > 100 {
+		limit = 100
+	}
+
+	type globalEntry struct {
+		Rank        int     `json:"rank"`
+		UserID      string  `json:"userId"`
+		DisplayName string  `json:"displayName"`
+		TotalScore  int     `json:"totalScore"`
+		TotalTime   float64 `json:"totalTime"`
+	}
+
+	var results []globalEntry
+
+	err := database.DB.Raw(`
+                SELECT 
+                        u.id as user_id, 
+                        u.display_name, 
+                        COALESCE(SUM(ts.score), 0) as total_score, 
+                        COALESCE(SUM(ts.total_time), 0) as total_time
+                FROM trackset_scores ts
+                JOIN tracksets t ON ts.trackset_id = t.id
+                JOIN users u ON ts.user_id = u.id
+                WHERE t.official = true
+                GROUP BY u.id, u.display_name
+                ORDER BY total_score DESC, total_time ASC
+                LIMIT ?
+        `, limit).Scan(&results).Error
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch global leaderboard"})
+	}
+
+	for i := range results {
+		results[i].Rank = i + 1
+	}
+
+	return c.JSON(results)
+}
