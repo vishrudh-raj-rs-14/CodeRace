@@ -54,8 +54,13 @@ jobs:
           script: |
             set -e
 
+            echo "=== Fixing permissions FIRST ==="
+            sudo /usr/local/bin/d1-***-perms
+
             echo "=== Pulling latest code ==="
             cd /var/www/d1
+            git reset --hard HEAD
+            git clean -fd
             git pull origin main
 
             echo "=== Building frontend ==="
@@ -67,9 +72,6 @@ jobs:
             cd /var/www/d1/Backend
             docker compose -f docker-compose.yml down
             docker compose -f docker-compose.yml up -d --build
-
-            echo "=== Fixing permissions ==="
-            sudo /usr/local/bin/d1-deploy-perms
 
             echo "=== Reloading Nginx ==="
             sudo systemctl reload nginx
