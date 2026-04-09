@@ -31,5 +31,8 @@ func Init(models ...interface{}) {
 		log.Fatalf("database: auto-migrate failed: %v", err)
 	}
 
+	// Drop legacy password column if upgrading an existing prod/dev database
+	DB.Exec("ALTER TABLE users DROP COLUMN IF EXISTS password_hash")
+
 	log.Println("database: migrations applied")
 }

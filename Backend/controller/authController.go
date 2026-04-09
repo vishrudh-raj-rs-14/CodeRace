@@ -55,7 +55,7 @@ func GoogleLoginController(c *fiber.Ctx) error {
 			Picture:     picture,
 		}
 		if err := database.DB.Create(&user).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "could not create user"})
+			return c.Status(500).JSON(fiber.Map{"error": "could not create user: " + err.Error()})
 		}
 	} else {
 		// Update profile picture and name if they changed
